@@ -441,6 +441,7 @@ router.get("/allstories", (req, res) => {
 
 
 // route GET/laststories : récupère les dernieres stories postées
+    // à supprimer : utiliser la route GET/allstories + faire un .sort({ createdAt: "desc" }) côté frontend 
 router.get("/laststories", (req, res) => {
     Story.find()
         .populate("author", ["username", "email"])

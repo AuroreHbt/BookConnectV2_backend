@@ -5,10 +5,10 @@ const userSchema = mongoose.Schema({
   email: String,
   password: String,
   token: String,
-  canCreateBook: Boolean, //par défaut = true
-  canCreateEvent: Boolean, //par défaut = true
-  canLikeBook: Boolean, //par défaut = true
-  canLikeEvent: Boolean, //par défaut = true
+  canCreateBook: Boolean, //par défaut = true, lié au token => droit donné ou non au user enregistré
+  canCreateEvent: Boolean, //par défaut = true, lié au token => droit donné ou non au user enregistré
+  canLikeBook: Boolean, //par défaut = true, lié au token => droit donné ou non au user enregistré
+  canLikeEvent: Boolean, //par défaut = true, lié au token => droit donné ou non au user enregistré
 });
 
 const User = mongoose.model('users', userSchema);
