@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const storySchema = mongoose.Schema({
-    author: { type: mongoose.Schema.Types.ObjectId, ref: 'users' }, // foreign key : user qui a créé la story
+    writer: { type: mongoose.Schema.Types.ObjectId, ref: 'users' }, // foreign key : user qui a créé la story
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'users' }], // foreign key : tableau des users qui ont liké l'event
     createdAt: Date,
     title: String, // Autre écriture rencontrée à confirmer : {type:String, require: true},
@@ -13,5 +13,4 @@ const storySchema = mongoose.Schema({
 });
 
 const Story = mongoose.model('stories', storySchema);
-
 module.exports = Story;

@@ -1,7 +1,10 @@
+// revoir .then() et async/await : l'un ou l'autre, async / await étant plus récent / moderne
+// virer axios car on utilise FECTCH API => axios.get remplacé par router.get
+// const axios = require("axios"); // Pour appeler OpenCage. Gestion automatique des JSON. Compatible avec Node.js
+
+
 const express = require("express");
 const router = express.Router();
-
-const axios = require("axios"); // Pour appeler OpenCage. Gestion automatique des JSON. Compatible avec Node.js
 
 // Créer un fichier avec un nom aléatoire via le module uniqid
 const uniqid = require("uniqid");
@@ -20,7 +23,7 @@ const User = require("../models/users");
 // import du module checkBody
 const { checkBody } = require("../modules/checkBody");
 
-const API_KEY_MAP = process.env.EXPO_PUBLIC_MAP_API_KEY;
+const API_KEY_MAP = process.env.API_KEY_MAP;
 
 router.post("/addevent", async (req, res) => {
   console.log("Requête body :", req.body);  // Log du corps de la requête pour débogage
@@ -86,7 +89,7 @@ router.post("/addevent", async (req, res) => {
     const openCageUrl = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(
       address
     )}&key=${API_KEY_MAP}`;
-    const geocodingResponse = await axios.get(openCageUrl);
+    const geocodingResponse = await router.get(openCageUrl);
 
     if (
       !geocodingResponse.data ||

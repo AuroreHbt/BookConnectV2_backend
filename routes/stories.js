@@ -1,3 +1,7 @@
+// revoir .then() et async/await : l'un ou l'autre, async / await étant plus récent / moderne
+// revoir la route PUT (back ok, front bug)
+
+
 const express = require("express");
 const router = express.Router();
 

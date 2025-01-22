@@ -1,3 +1,7 @@
+// revoir .then() et async/await : l'un ou l'autre, async / await étant plus récent / moderne
+// 
+
+
 var express = require('express');
 var router = express.Router();
 
