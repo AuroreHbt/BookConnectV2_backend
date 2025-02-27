@@ -6,6 +6,9 @@ const userSchema = mongoose.Schema({
   password: String,
   token: String, // à utiliser pour authentifier le user connecté + gestion des droits d'accès
 
+  following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'users' }], // Liste des auteurs suivis
+  followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'users' }], // Liste des abonnés
+
   // prévoir profil admin
   canUpdateUser: Boolean, //par défaut = true, lié au token => droit donné ou non au user enregistré
   canDeleteUser: Boolean, //par défaut = true, lié au token => droit donné ou non au user enregistré
