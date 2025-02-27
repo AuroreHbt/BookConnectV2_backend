@@ -1,88 +1,144 @@
-// revoir .then() et async/await : l'un ou l'autre, async / await étant plus récent / moderne
-// 
+require('dotenv').config(); // Charge les variables d'environnement depuis le fichier .env
 
+const express = require("express");
+const router = express.Router();
+const User = require("../models/users");
+const { checkBody } = require("../modules/checkBody");
+const bcrypt = require("bcrypt");
+const uid2 = require("uid2");
+const cloudinary = require("cloudinary").v2;
+const fs = require("fs");
+const mime = require("mime-types");
 
-var express = require('express');
-var router = express.Router();
+// Configuration de Cloudinary via CLOUDINARY_URL
+cloudinary.config();
 
-// import du Model
-const User = require('../models/users');
-
-// import du module checkBody
-const { checkBody } = require('../modules/checkBody');
-
-// imports pour l'authentification (hash/token) 
-const bcrypt = require('bcrypt');
-const uid2 = require('uid2');
-
-
-// route POST pour s'inscrire (new user)
-router.post('/signup', async (req, res) => {
-  console.log(req.body);
-
-  if (!checkBody(req.body, ['username', 'email', 'password'])) {
-    res.json({ result: false, error: 'Missing or empty fields' });
-    return;
+// Route POST pour s'inscrire
+router.post("/signup", async (req, res) => {
+  if (!checkBody(req.body, ["username", "email", "password"])) {
+    return res.json({ result: false, error: "Missing fields" });
   }
-
-  // Check if the user has not already been registered
-  await User.findOne({ username: { $regex: new RegExp(req.body.username, 'i') } })
-    .then(data => {
-      if (data === null) {
-        const hash = bcrypt.hashSync(req.body.password, 10);
-
-        const newUser = new User({
-          username: req.body.username,
-          email: req.body.email,
-          password: hash,
-          token: uid2(32),
-        });
-
-        newUser.save().then(newDoc => {
-          console.log(newDoc);
-          res.json({ result: true, username: newDoc.username, token: newDoc.token });
-        });
-      } else {
-        // User already exists in database
-        res.json({ result: false, error: 'User already exists' });
-      }
+  try {
+    const existingUser = await User.findOne({ username: new RegExp(req.body.username, "i") });
+    if (existingUser) return res.json({ result: false, error: "User already exists" });
+    const hash = bcrypt.hashSync(req.body.password, 10);
+    const newUser = new User({
+      username: req.body.username,
+      email: req.body.email,
+      password: hash,
+      token: uid2(32),
     });
+    const savedUser = await newUser.save();
+    res.json({ result: true, username: savedUser.username, token: savedUser.token });
+  } catch (error) {
+    res.status(500).json({ result: false, error: "Internal server error" });
+  }
 });
 
-// route POST pour se connecter (user déjà inscrit)
-router.post('/signin', async (req, res) => {
-  console.log('req.body: ', req.body);
-
-  if (!checkBody(req.body, ['email', 'password'])) {
-    res.json({ result: false, error: 'Missing or empty fields' });
-    return;  //l'utilisateur n'a pas (ou mal) rempli tous les champs (early return)
+// Route POST pour se connecter
+router.post("/signin", async (req, res) => {
+  if (!checkBody(req.body, ["email", "password"])) {
+    return res.json({ result: false, error: "Missing fields" });
   }
-
-  // Vérifier que l'email existe dans la BDD
-  const user = await User.findOne({ email: req.body.email.toLowerCase() });
-  console.log('Recherche user par son email :', req.body.email.toLowerCase());
-  console.log('user: ', user);
-
-  // si le user est trouvé par son mail dans la BDD et que le mdp correspond => connexion ok
-  if (user !== null) {
-    // Comparer le mot de passe uniquement si l'utilisateur existe
-    if (bcrypt.compareSync(req.body.password, user.password)) {
-      res.json({
+  try {
+    const user = await User.findOne({ email: req.body.email.toLowerCase() });
+    if (user && bcrypt.compareSync(req.body.password, user.password)) {
+      return res.json({
         result: true,
         username: user.username,
         email: user.email,
         token: user.token,
-        _id: user._id
+        _id: user._id,
       });
-      // si le mdp est ok, user trouvé => la connexion s'effectue
-    } else {
-      res.json({ result: false, error: 'Utilisateur non trouvé ou erreur de mot de passe' });
-      // Mot de passe incorrect => connexion annulée
     }
-  } else {
-    res.json({ result: false, error: 'Utilisateur non trouvé ou erreur de mot de passe' });
-    // Utilisateur non trouvé => pas de comparaison de mdp et connexion annulée
+    res.json({ result: false, error: "User not found or password error" });
+  } catch (error) {
+    res.status(500).json({ result: false, error: "Internal server error" });
   }
+});
+
+// GÉNÉRER UNE SIGNATURE POUR CLOUDINARY
+router.get("/uploadAvatar", (req, res) => {
+  const timestamp = Math.round(new Date().getTime() / 1000);
+  const paramsToSign = {
+    timestamp,
+    folder: "avatars",
+    upload_preset: "avatars"
+  };
+
+  const signature = cloudinary.utils.api_sign_request(
+    paramsToSign,
+    cloudinary.config().api_secret
+  );
+
+  res.json({
+    signature,
+    timestamp,
+    api_key: cloudinary.config().api_key,
+    upload_preset: "avatars",
+    cloudName: cloudinary.config().cloud_name
+  });
+});
+
+
+
+// METTRE À JOUR L’AVATAR DE L’UTILISATEUR
+router.post("/updateAvatar", async (req, res) => {
+  const { userId, avatarUrl } = req.body;
+  if (!userId || !avatarUrl) return res.status(400).json({ result: false, error: "Missing data" });
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ result: false, error: "User not found" });
+
+    if (user.avatarUrl) {
+      const publicId = user.avatarUrl.split("/").pop().split(".")[0];
+      await cloudinary.uploader.destroy(publicId);
+    }
+
+    user.avatarUrl = avatarUrl;
+    await user.save();
+
+    res.json({ result: true, avatarUrl: user.avatarUrl });
+  } catch (error) {
+    res.status(500).json({ result: false, error: "Server error" });
+  }
+});
+
+
+// Route GET pour récupérer les avatars
+router.get("/avatars", async (req, res) => {
+  try {
+    const result = await cloudinary.api.resources({
+      type: "upload",
+      prefix: "avatars",
+      max_results: 20,
+      next_cursor: req.query.cursor || null,
+    });
+    const avatars = result.resources
+      .filter((r) => r.resource_type === "image")
+      .map((r) => r.secure_url);
+    res.json({ avatars, nextCursor: result.next_cursor || null });
+  } catch (error) {
+    res.status(500).json({ error: "Could not retrieve avatars", details: error.message });
+  }
+});
+
+// Route GET pour générer la signature pour un upload signé via le preset "avatars"
+router.get("/uploadAvatar", (req, res) => {
+  const timestamp = Math.round(Date.now() / 1000);
+  const paramsToSign = {
+    timestamp,
+    folder: "avatars",
+    upload_preset: "avatars",
+  };
+  const signature = cloudinary.utils.api_sign_request(paramsToSign, cloudinary.config().api_secret);
+  res.json({
+    signature,
+    timestamp,
+    api_key: cloudinary.config().api_key,
+    upload_preset: "avatars",
+  });
 });
 
 module.exports = router;
