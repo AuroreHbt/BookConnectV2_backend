@@ -186,25 +186,43 @@ router.post("/addstory", async (req, res) => {
 
 
 // Route GET/mypublishedstory/:writer pour chercher les nouvelles histoires postées par un auteur
-router.get("/mypublishedstory/:writer", (req, res) => {
-    console.log("Requête reçue pour auteur :", req.params.writer);
+router.get("/mypublishedstory/:writer", async (req, res) => {
+    try {
+        console.log("Requête reçue pour récupérer les histoires de :", req.params.writer);
 
-    // Recherche de l'utilisateur dans la base de données
-    User.findOne({ username: req.params.writer }).then((user) => {
-        // Si aucun utilisateur trouvé, renvoie une erreur
-        if (!user) {
-            return res.json({ result: false, error: "Auteur non trouvé" });
+        // Vérification si le nom d’auteur est bien fourni
+        if (!req.params.writer) {
+            return res.status(400).json({ result: false, error: "Nom d'auteur manquant" });
         }
-        // Si l'utilisateur est trouvé, rechercher toutes les histoires associées à son ID
-        Story.find({ writer: user._id })
-            .populate("writer", ["username", "email"]) // Remplit les détails de l'auteur (nom d'utilisateur et email) pour chaque histoire
-            .populate("category")
-            .sort({ createdAt: "desc" }) // Trie les histoires par ordre décroissant de date de création
-            .then((stories) => {
-                console.log("histoires trouvées :", stories); // stories = [{...}]
-                res.json({ result: true, stories }); // Renvoyer les histoires trouvées
-            });
-    });
+
+        // Recherche de l'utilisateur (auteur) par son username
+        const user = await User.findOne({ username: req.params.writer });
+
+        //  Vérifier si l'auteur existe bien
+        if (!user) {
+            return res.status(404).json({ result: false, error: "Auteur non trouvé" });
+        }
+
+        //  Récupération des histoires de cet auteur, triées par date de création (du plus récent au plus ancien)
+        const stories = await Story.find({ writer: user._id })
+            .populate("writer", ["username", "email"]) // Remplit les détails de l'auteur (nom d'utilisateur et email)
+            .populate("category") // Récupère les infos des catégories liées
+            .sort({ createdAt: "desc" }); // Trie les histoires par ordre décroissant de création
+
+        console.log("Histoires trouvées :", stories.length);
+
+        if (stories.length === 0) {
+            return res.json({result : true, message: 'Aucune histoire trouvée pour cet auteur', stories: [] })
+        }
+
+        // Envoi de la réponse JSON avec les histoires trouvées
+        res.json({ result: true, stories });
+
+    } catch (error) {
+        //  Gestion des erreurs en cas de problème serveur ou base de données
+        console.error("Erreur lors de la récupération des histoires :", error);
+        res.status(500).json({ result: false, error: "Erreur serveur" });
+    }
 });
 
 
@@ -459,6 +477,12 @@ router.get("/laststories", (req, res) => {
             }
             res.json({ result: true, stories })
         })
+})
+
+
+// route post pour enregistrer les follow/unffolow d'un writer relié à un user
+router.post("/follow", (req, res) => {
+    
 })
 
 module.exports = router;
