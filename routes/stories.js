@@ -450,23 +450,6 @@ router.get("/search", (req, res) => {
 router.get("/allstories", (req, res) => {
     Story.find()
         .populate("writer", ["username", "email"])
-        .then((stories) => {
-            if (!stories || stories.length === 0) {
-                return res.json({
-                    result: false,
-                    error: "Aucune histoire trouvée pour les critères donnés.",
-                });
-            }
-            res.json({ result: true, stories })
-        })
-})
-
-
-// route GET/laststories : récupère les dernieres stories postées
-    // à supprimer : utiliser la route GET/allstories + faire un .sort({ createdAt: "desc" }) côté frontend 
-router.get("/laststories", (req, res) => {
-    Story.find()
-        .populate("writer", ["username", "email"])
         .sort({ createdAt: "desc" })
         .then((stories) => {
             if (!stories || stories.length === 0) {
@@ -480,9 +463,88 @@ router.get("/laststories", (req, res) => {
 })
 
 
-// route post pour enregistrer les follow/unffolow d'un writer relié à un user
-router.post("/follow", (req, res) => {
-    
-})
+// // route GET/laststories : récupère les dernieres stories postées
+//     // à supprimer : utiliser la route GET/allstories + faire un .sort({ createdAt: "desc" }) côté frontend 
+// router.get("/laststories", (req, res) => {
+//     Story.find()
+//         .populate("writer", ["username", "email"])
+//         .sort({ createdAt: "desc" })
+//         .then((stories) => {
+//             if (!stories || stories.length === 0) {
+//                 return res.json({
+//                     result: false,
+//                     error: "Aucune histoire trouvée pour les critères donnés.",
+//                 });
+//             }
+//             res.json({ result: true, stories })
+//         })
+// })
+
+
+// Route POST pour ajouter ou modifier une note
+router.post("/addVote", async (req, res) => {
+    const { storyId, rating } = req.body;
+
+    // Vérifier si le token est envoyé (identification de l'utilisateur)
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) {
+        return res.status(401).json({ result: false, error: "Unauthorized: Token manquant" });
+    }
+
+    // Vérification des champs obligatoires
+    if (!storyId || !rating) {
+        return res.status(400).json({ result: false, error: "Missing fields" });
+    }
+
+    // Vérification que la note est comprise entre 1 et 5
+    if (rating < 1 || rating > 5) {
+        return res.status(400).json({ result: false, error: "Invalid rating: doit être entre 1 et 5" });
+    }
+
+    try {
+        // Vérifier si l'utilisateur existe avec le token
+        const user = await User.findOne({ token });
+        if (!user) {
+            return res.status(404).json({ result: false, error: "Utilisateur non trouvé" });
+        }
+
+        // Vérifier si l'histoire existe
+        const story = await Story.findById(storyId);
+        if (!story) {
+            return res.status(404).json({ result: false, error: "Histoire non trouvée" });
+        }
+
+        // Vérifier si l'utilisateur a déjà voté pour cette histoire
+        const existingVote = user.votes.find(vote => vote.storyId.toString() === storyId);
+
+        if (existingVote) {
+            // Mise à jour du vote existant
+            existingVote.rating = rating;
+        } else {
+            // Ajouter un nouveau vote
+            user.votes.push({ storyId, rating });
+        }
+
+        // Sauvegarder l'utilisateur avec son nouveau vote
+        await user.save();
+
+        // Mettre à jour les votes dans l'histoire
+        const allVotes = user.votes.filter(vote => vote.storyId.toString() === storyId).map(vote => vote.rating);
+        const totalVotes = allVotes.length;
+        const averageRating = allVotes.reduce((sum, vote) => sum + vote, 0) / totalVotes;
+
+        // Mettre à jour l'histoire
+        story.votes = totalVotes;
+        story.rating = averageRating;
+        await story.save();
+
+        res.json({ result: true, message: "Vote enregistré avec succès", totalVotes, averageRating });
+
+    } catch (error) {
+        console.error("❌ Erreur serveur :", error);
+        res.status(500).json({ result: false, error: "Erreur serveur" });
+    }
+});
+
 
 module.exports = router;

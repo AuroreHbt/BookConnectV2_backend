@@ -10,6 +10,13 @@ const userSchema = mongoose.Schema({
   following: [{ type: mongoose.Schema.Types.ObjectId, ref: 'users' }], // Liste des auteurs suivis
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'users' }], // Liste des abonnés
 
+  votes : [
+    {
+      storyId: { type: mongoose.Schema.Types.ObjectId, ref: "stories"},
+      rating: Number,
+    },
+  ],
+  
   // prévoir profil admin
   canUpdateUser: Boolean, //par défaut = true, lié au token => droit donné ou non au user enregistré
   canDeleteUser: Boolean, //par défaut = true, lié au token => droit donné ou non au user enregistré
